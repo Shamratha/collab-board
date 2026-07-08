@@ -17,7 +17,7 @@ Built in phases; each phase is independently runnable and demoable.
 - [x] **Phase 1a** — auth: register / login / me (JWT), tests
 - [x] **Phase 1b** — boards + membership + role-based permissions
 - [x] **Phase 1c (API)** — lists + cards CRUD, float-position ordering, cascade deletes
-- [ ] **Phase 1c (UI)** — React client + drag-and-drop board
+- [x] **Phase 1c (UI)** — React client: auth pages, boards list, drag-and-drop board
 - [ ] **Phase 2** — Socket.io live sync across clients
 - [ ] **Phase 3 (stretch)** — optimistic UI + version-based conflict resolution
 
@@ -51,9 +51,16 @@ Requires Node ≥ 20 and a MongoDB connection string (MongoDB Atlas free tier, o
 ```bash
 git clone <repo> && cd collab-board
 npm install
-cp .env.example .env         # then fill in MONGO_URI and JWT_SECRET
-npm run dev                  # starts the API on http://localhost:4000
+npm run dev:server           # API on http://localhost:4000
+npm run dev:client           # web client on http://localhost:5173  (separate terminal)
 ```
+
+Then open http://localhost:5173, sign up, and create a board.
+
+**Zero-setup dev mode:** if no `MONGO_URI` is set, the server boots an in-memory
+MongoDB automatically (data is not persisted between restarts) — so `npm run dev:server`
+works with no database install. For persistent data, copy `.env.example` → `.env`
+and set `MONGO_URI` (Atlas free tier or local `mongod`) and `JWT_SECRET`.
 
 Health check: `curl http://localhost:4000/health` → `{"status":"ok"}`.
 

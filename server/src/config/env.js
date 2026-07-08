@@ -2,11 +2,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const isTest = process.env.NODE_ENV === 'test';
+const isProd = process.env.NODE_ENV === 'production';
 
-// In test we let mongodb-memory-server provide the URI at runtime, and we
-// fall back to a throwaway secret so the suite can run without a real .env.
-const required = isTest ? [] : ['MONGO_URI', 'JWT_SECRET'];
+// Only production hard-requires real config. In dev/test we fall back to an
+// in-memory MongoDB (see index.js) and a throwaway JWT secret, so the app runs
+// with zero setup.
+const required = isProd ? ['MONGO_URI', 'JWT_SECRET'] : [];
 
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length > 0) {
@@ -14,6 +15,8 @@ if (missing.length > 0) {
   console.error(`Missing required env vars: ${missing.join(', ')}`);
   process.exit(1);
 }
+
+const isTest = process.env.NODE_ENV === 'test';
 
 export const env = {
   port: Number(process.env.PORT) || 4000,

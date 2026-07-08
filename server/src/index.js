@@ -4,8 +4,23 @@ import { env } from './config/env.js';
 import { connectDB } from './config/db.js';
 import { createApp } from './app.js';
 
+// Dev convenience: if no MONGO_URI is configured (and we're not in production),
+// spin up an in-memory MongoDB so `npm run dev` just works with zero setup.
+async function resolveMongoUri() {
+  if (env.mongoUri) return env.mongoUri;
+  if (env.nodeEnv === 'production') {
+    throw new Error('MONGO_URI is required in production');
+  }
+  const { MongoMemoryServer } = await import('mongodb-memory-server');
+  const mem = await MongoMemoryServer.create();
+  // eslint-disable-next-line no-console
+  console.log('No MONGO_URI set — using an in-memory MongoDB (data is not persisted)');
+  return mem.getUri();
+}
+
 async function start() {
-  await connectDB();
+  const uri = await resolveMongoUri();
+  await connectDB(uri);
 
   const app = createApp();
   const server = http.createServer(app);
