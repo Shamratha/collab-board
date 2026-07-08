@@ -19,9 +19,10 @@ Built in phases; each phase is independently runnable and demoable.
 - [x] **Phase 1c (API)** — lists + cards CRUD, float-position ordering, cascade deletes
 - [x] **Phase 1c (UI)** — React client: auth pages, boards list, drag-and-drop board
 - [x] **Phase 2** — Socket.io live sync across clients
-- [ ] **Phase 3 (stretch)** — optimistic UI + version-based conflict resolution
+- [x] **Phase 3 (stretch)** — optimistic UI + version-based conflict resolution
 
-**Backend test coverage:** 42 tests across auth, boards/RBAC, and lists/cards (run `npm test`).
+**Backend test coverage:** 45 tests across auth, boards/RBAC, lists/cards, and
+optimistic-concurrency conflicts (run `npm test`).
 
 ### Real-time sync (Phase 2)
 
@@ -35,6 +36,22 @@ the REST layer stays the single source of truth ("commit then broadcast"):
    (`card:created`, `card:updated`, `card:deleted`, `list:*`).
 4. Clients apply events **idempotently by id**, so every viewer — including the
    originator — converges on server state with no double-applies.
+
+### Optimistic UI + conflict resolution (Phase 3)
+
+Card edits apply **optimistically** — the change shows instantly and reconciles
+with the server response (rolling back if the request fails). Concurrent edits
+to the same card are caught with **optimistic concurrency control**:
+
+- Every card carries a `version` that increments on each edit.
+- A content edit sends the version the client last saw. If the card has since
+  changed, the server rejects with **HTTP 409** and returns the current card.
+- The client shows a **merge prompt** (their version vs. yours) and lets the
+  user *keep theirs* or *overwrite* — where "overwrite" re-applies the edit on
+  top of the now-current version.
+
+Card *moves* (drag-and-drop) intentionally skip the version check — they're
+last-writer-wins, which is the right semantics for reordering.
 
 ## Architecture
 

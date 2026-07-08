@@ -14,6 +14,7 @@ import { getSocket } from '../socket.js';
 import { positionBetween } from '../utils/position.js';
 import ListColumn from '../components/ListColumn.jsx';
 import CardModal from '../components/CardModal.jsx';
+import ConflictDialog from '../components/ConflictDialog.jsx';
 
 // Group a flat, position-sorted card array into { listId: [cards] }, ensuring
 // every list (even empty ones) has an entry.
@@ -28,6 +29,15 @@ function groupCards(lists, cards) {
   return byList;
 }
 
+// Replace a card (matched by id) in place across the grouped state.
+function replaceById(byList, card) {
+  const next = {};
+  for (const [listId, cards] of Object.entries(byList)) {
+    next[listId] = cards.map((c) => (c._id === card._id ? card : c));
+  }
+  return next;
+}
+
 export default function BoardView() {
   const { id } = useParams();
   const [board, setBoard] = useState(null);
@@ -35,6 +45,7 @@ export default function BoardView() {
   const [cardsByList, setCardsByList] = useState({});
   const [activeCard, setActiveCard] = useState(null);
   const [openCard, setOpenCard] = useState(null);
+  const [conflict, setConflict] = useState(null);
   const [newListTitle, setNewListTitle] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -198,11 +209,21 @@ export default function BoardView() {
     reordered[idx] = { ...reordered[idx], position, list: to };
     setCardsByList((prev) => ({ ...prev, [to]: reordered }));
 
+    // The move is already applied optimistically above; if the server rejects
+    // it, resync from the authoritative board state.
     try {
       await api.patch(`/cards/${active.id}`, { list: to, position });
     } catch (err) {
       setError(err.message);
+      refetch();
     }
+  }
+
+  async function refetch() {
+    const { data } = await api.get(`/boards/${id}`);
+    setBoard(data.board);
+    setLists(data.lists);
+    setCardsByList(groupCards(data.lists, data.cards));
   }
 
   async function addList(e) {
@@ -235,15 +256,70 @@ export default function BoardView() {
     });
   }
 
+  // Optimistic edit: apply the change locally right away, then reconcile with
+  // the server. A 409 means someone else edited first — surface a conflict
+  // prompt rather than silently overwriting.
   async function saveCard(cardId, patch) {
-    const { data } = await api.patch(`/cards/${cardId}`, patch);
+    const previous = Object.values(cardsByList)
+      .flat()
+      .find((c) => c._id === cardId);
+
+    // Optimistic local update.
     setCardsByList((prev) => {
       const next = {};
       for (const [listId, cards] of Object.entries(prev)) {
-        next[listId] = cards.map((c) => (c._id === cardId ? data.card : c));
+        next[listId] = cards.map((c) =>
+          c._id === cardId
+            ? { ...c, title: patch.title, description: patch.description }
+            : c
+        );
       }
       return next;
     });
+
+    try {
+      const { data } = await api.patch(`/cards/${cardId}`, patch);
+      setCardsByList((prev) => replaceById(prev, data.card)); // adopt server truth
+    } catch (err) {
+      if (err.status === 409 && err.data?.card) {
+        // Show the board the current server card, and open the merge prompt.
+        setCardsByList((prev) => replaceById(prev, err.data.card));
+        setConflict({
+          attempted: { title: patch.title, description: patch.description },
+          server: err.data.card,
+        });
+      } else {
+        if (previous) setCardsByList((prev) => replaceById(prev, previous)); // rollback
+        setError(err.message);
+      }
+    }
+  }
+
+  // Conflict resolution — re-apply my edit on top of the current version.
+  async function resolveOverwrite() {
+    const { attempted, server } = conflict;
+    try {
+      const { data } = await api.patch(`/cards/${server._id}`, {
+        ...attempted,
+        version: server.version,
+      });
+      setCardsByList((prev) => replaceById(prev, data.card));
+      setConflict(null);
+    } catch (err) {
+      if (err.status === 409 && err.data?.card) {
+        // Changed again in the meantime — refresh the comparison.
+        setCardsByList((prev) => replaceById(prev, err.data.card));
+        setConflict({ attempted, server: err.data.card });
+      } else {
+        setError(err.message);
+        setConflict(null);
+      }
+    }
+  }
+
+  function resolveDiscard() {
+    // Board already shows the server card; just close the prompt.
+    setConflict(null);
   }
 
   async function deleteCard(cardId) {
@@ -318,6 +394,15 @@ export default function BoardView() {
           onSave={saveCard}
           onDelete={deleteCard}
           onClose={() => setOpenCard(null)}
+        />
+      )}
+
+      {conflict && (
+        <ConflictDialog
+          attempted={conflict.attempted}
+          server={conflict.server}
+          onOverwrite={resolveOverwrite}
+          onDiscard={resolveDiscard}
         />
       )}
     </div>

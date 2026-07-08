@@ -10,7 +10,12 @@ export default function CardModal({ card, onSave, onDelete, onClose }) {
     if (!title.trim()) return;
     setBusy(true);
     try {
-      await onSave(card._id, { title: title.trim(), description });
+      // Send the version we loaded so the server can detect a concurrent edit.
+      await onSave(card._id, {
+        title: title.trim(),
+        description,
+        version: card.version,
+      });
       onClose();
     } finally {
       setBusy(false);

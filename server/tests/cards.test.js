@@ -140,6 +140,42 @@ describe('cards', () => {
     expect(res.status).toBe(403);
   });
 
+  it('accepts an edit whose version matches the current card', async () => {
+    const list = await addList();
+    const card = await addCard(list._id, 'v0'); // version 0
+    const res = await owner
+      .auth(request(app).patch(`/api/cards/${card._id}`))
+      .send({ title: 'v1', version: 0 });
+    expect(res.status).toBe(200);
+    expect(res.body.card.version).toBe(1);
+  });
+
+  it('rejects a stale-version edit with 409 and returns the current card', async () => {
+    const list = await addList();
+    const card = await addCard(list._id, 'v0'); // version 0
+    // First edit succeeds and bumps the version to 1.
+    await owner
+      .auth(request(app).patch(`/api/cards/${card._id}`))
+      .send({ title: 'v1', version: 0 })
+      .expect(200);
+    // A second edit still claiming version 0 is stale → 409 + current card.
+    const res = await owner
+      .auth(request(app).patch(`/api/cards/${card._id}`))
+      .send({ title: 'v2', version: 0 });
+    expect(res.status).toBe(409);
+    expect(res.body.card.title).toBe('v1');
+    expect(res.body.card.version).toBe(1);
+  });
+
+  it('allows edits with no version (last-writer-wins moves)', async () => {
+    const list = await addList();
+    const card = await addCard(list._id, 'v0');
+    const res = await owner
+      .auth(request(app).patch(`/api/cards/${card._id}`))
+      .send({ title: 'moved' }); // no version → no conflict check
+    expect(res.status).toBe(200);
+  });
+
   it('deletes a card', async () => {
     const list = await addList();
     const card = await addCard(list._id);

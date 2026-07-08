@@ -20,12 +20,16 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Normalize server error messages so callers can show `err.message`.
+// Normalize server errors: expose `err.message`, plus `err.status` and
+// `err.data` so callers can react to specific cases (e.g. a 409 conflict that
+// carries the current server card).
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    const message =
-      err.response?.data?.error || err.message || 'Something went wrong';
-    return Promise.reject(new Error(message));
+    const res = err.response;
+    const error = new Error(res?.data?.error || err.message || 'Something went wrong');
+    error.status = res?.status;
+    error.data = res?.data;
+    return Promise.reject(error);
   }
 );

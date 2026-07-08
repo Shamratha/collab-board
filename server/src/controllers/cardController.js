@@ -32,7 +32,18 @@ export async function createCard(req, res, next) {
 // `before`/`after`). Every successful edit bumps `version`.
 export async function updateCard(req, res, next) {
   try {
-    const { title, description, list, position, before, after } = req.body || {};
+    const { title, description, list, position, before, after, version } =
+      req.body || {};
+
+    // Optimistic concurrency control: if the client sends the version it last
+    // saw and the card has since moved on, reject with 409 + the current card
+    // so the client can show a conflict/merge prompt instead of clobbering.
+    if (version !== undefined && Number(version) !== req.card.version) {
+      return res.status(409).json({
+        error: 'This card was changed by someone else',
+        card: req.card,
+      });
+    }
 
     if (title !== undefined) {
       if (!String(title).trim()) throw new ApiError(400, 'title cannot be empty');
