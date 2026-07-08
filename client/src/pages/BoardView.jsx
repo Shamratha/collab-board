@@ -15,6 +15,7 @@ import { positionBetween } from '../utils/position.js';
 import ListColumn from '../components/ListColumn.jsx';
 import CardModal from '../components/CardModal.jsx';
 import ConflictDialog from '../components/ConflictDialog.jsx';
+import { listColor } from '../theme.js';
 
 // Group a flat, position-sorted card array into { listId: [cards] }, ensuring
 // every list (even empty ones) has an entry.
@@ -334,18 +335,24 @@ export default function BoardView() {
     setOpenCard(null);
   }
 
-  if (loading) return <div className="p-8 text-slate-500">Loading board…</div>;
-  if (error && !board) return <div className="p-8 text-red-600">{error}</div>;
+  if (loading) return <div className="p-8 text-muted">Loading board…</div>;
+  if (error && !board) return <div className="p-8 text-accent-ink">{error}</div>;
 
   return (
     <div className="px-6 py-6">
-      <div className="mb-4 flex items-center gap-3">
-        <Link to="/" className="text-sm text-slate-500 hover:underline">
+      <div className="mb-5 flex items-center gap-3">
+        <Link
+          to="/"
+          className="rounded-lg border border-line bg-surface px-2.5 py-1 text-sm text-muted transition hover:text-ink"
+        >
           ← Boards
         </Link>
-        <h1 className="text-xl font-semibold text-slate-800">{board?.title}</h1>
+        <h1 className="font-display text-2xl font-bold text-ink">{board?.title}</h1>
+        <span className="ml-1 rounded-full bg-teal/15 px-2 py-0.5 text-xs font-medium text-teal">
+          live
+        </span>
       </div>
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-sm text-accent-ink">{error}</p>}
 
       <DndContext
         sensors={sensors}
@@ -354,11 +361,12 @@ export default function BoardView() {
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
       >
-        <div className="flex items-start gap-4 overflow-x-auto pb-4">
-          {lists.map((list) => (
+        <div className="board-scroll flex items-start gap-4 overflow-x-auto pb-4">
+          {lists.map((list, i) => (
             <ListColumn
               key={list._id}
               list={list}
+              color={listColor(i)}
               cards={cardsByList[list._id] || []}
               onAddCard={addCard}
               onDeleteList={deleteList}
@@ -368,20 +376,20 @@ export default function BoardView() {
 
           <form
             onSubmit={addList}
-            className="w-72 shrink-0 rounded-lg bg-slate-200/50 p-3"
+            className="w-72 shrink-0 rounded-xl border border-dashed border-line bg-surface/50 p-2.5"
           >
             <input
               value={newListTitle}
               onChange={(e) => setNewListTitle(e.target.value)}
-              placeholder="+ Add a list"
-              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+              placeholder="+ Add another list"
+              className="w-full rounded-lg bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted"
             />
           </form>
         </div>
 
         <DragOverlay>
           {activeCard ? (
-            <div className="rounded-md border border-indigo-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-lg">
+            <div className="rotate-2 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm font-medium text-ink shadow-xl">
               {activeCard.title}
             </div>
           ) : null}

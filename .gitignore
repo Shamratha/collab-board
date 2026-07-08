@@ -3,6 +3,9 @@ dist/
 build/
 coverage/
 
+# local persistent dev database
+.data/
+
 # env
 .env
 .env.local

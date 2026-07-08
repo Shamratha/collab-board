@@ -1,7 +1,24 @@
 @import 'tailwindcss';
 
+/* Design tokens — a warm "paper workshop" palette, ink + coral, not the
+   default indigo-on-slate. Exposed as Tailwind utilities via @theme. */
+@theme {
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-paper: #f4efe4;
+  --color-surface: #fffdf8;
+  --color-ink: #221d17;
+  --color-muted: #8b8172;
+  --color-line: #e6ddca;
+  --color-accent: #e4572e; /* coral */
+  --color-accent-ink: #b83f1d;
+  --color-teal: #2a9d8f;
+  --color-mustard: #e0a100;
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 html,
@@ -12,5 +29,39 @@ body,
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  /* Cream canvas with a faint engineering-notebook dot grid. */
+  background-color: var(--color-paper);
+  background-image: radial-gradient(rgba(34, 29, 23, 0.06) 1.1px, transparent 1.1px);
+  background-size: 22px 22px;
+}
+
+/* Slightly tighter, more editorial display headings. */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* A hand-drawn-ish underline accent used behind key words. */
+.ink-mark {
+  background: linear-gradient(transparent 62%, rgba(228, 87, 46, 0.28) 62%);
+}
+
+/* Cards lift a touch on hover — small tactile feedback. */
+.card-lift {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* Thin custom scrollbar for the horizontal board. */
+.board-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+.board-scroll::-webkit-scrollbar-thumb {
+  background: #d8cdb4;
+  border-radius: 999px;
+  border: 3px solid var(--color-paper);
 }

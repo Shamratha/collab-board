@@ -9,7 +9,7 @@ import Navbar from './components/Navbar.jsx';
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) {
-    return <div className="p-8 text-slate-500">Loading…</div>;
+    return <div className="p-8 text-muted">Loading…</div>;
   }
   return user ? children : <Navigate to="/login" replace />;
 }
@@ -18,7 +18,7 @@ export default function App() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-full bg-slate-100 text-slate-900">
+    <div className="min-h-full text-ink">
       {user && <Navbar />}
       <Routes>
         <Route path="/login" element={<Login />} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
+import { listColor } from '../theme.js';
 
 export default function BoardsList() {
   const [boards, setBoards] = useState([]);
@@ -29,41 +30,67 @@ export default function BoardsList() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
-      <h1 className="mb-6 text-2xl font-semibold text-slate-800">Your boards</h1>
+    <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="mb-8">
+        <h1 className="font-display text-3xl font-bold text-ink">
+          Your <span className="ink-mark">boards</span>
+        </h1>
+        <p className="mt-1 text-muted">Everything your team is working on, in one place.</p>
+      </div>
 
-      <form onSubmit={createBoard} className="mb-8 flex gap-2">
+      <form onSubmit={createBoard} className="mb-10 flex max-w-lg gap-2">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="New board title…"
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2"
+          placeholder="Name a new board — “Q3 Launch”, “Bug triage”…"
+          className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
         />
-        <button className="rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700">
+        <button className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-accent-ink">
           Create
         </button>
       </form>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-accent-ink">{error}</p>}
+
       {loading ? (
-        <p className="text-slate-500">Loading…</p>
+        <p className="text-muted">Loading…</p>
       ) : boards.length === 0 ? (
-        <p className="text-slate-500">No boards yet — create your first one above.</p>
+        <div className="rounded-2xl border border-dashed border-line bg-surface/60 px-8 py-14 text-center">
+          <div className="mb-2 text-3xl">🗂️</div>
+          <p className="font-display text-lg font-semibold text-ink">No boards yet</p>
+          <p className="mt-1 text-muted">
+            Every big thing starts as an empty first column. Create one above.
+          </p>
+        </div>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {boards.map((b) => (
-            <li key={b._id}>
-              <Link
-                to={`/boards/${b._id}`}
-                className="block rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-300 hover:shadow"
-              >
-                <div className="font-medium text-slate-800">{b.title}</div>
-                <div className="mt-1 text-xs text-slate-500">
-                  {b.members.length} member{b.members.length === 1 ? '' : 's'}
-                </div>
-              </Link>
-            </li>
-          ))}
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {boards.map((b, i) => {
+            const color = listColor(i);
+            return (
+              <li key={b._id}>
+                <Link
+                  to={`/boards/${b._id}`}
+                  className="card-lift block overflow-hidden rounded-xl border border-line bg-surface shadow-sm"
+                >
+                  <div className="h-1.5" style={{ background: color }} />
+                  <div className="p-5">
+                    <div className="font-display text-lg font-semibold text-ink">
+                      {b.title}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted">
+                      <span
+                        className="inline-grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold text-white"
+                        style={{ background: color }}
+                      >
+                        {b.members.length}
+                      </span>
+                      {b.members.length === 1 ? 'just you' : `${b.members.length} members`}
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

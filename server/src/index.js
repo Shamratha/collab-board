@@ -1,21 +1,34 @@
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Server as SocketServer } from 'socket.io';
 import { env } from './config/env.js';
 import { connectDB } from './config/db.js';
 import { createApp } from './app.js';
 import { registerSockets } from './sockets/index.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 // Dev convenience: if no MONGO_URI is configured (and we're not in production),
-// spin up an in-memory MongoDB so `npm run dev` just works with zero setup.
+// run a local MongoDB backed by the mongodb-memory-server binary — but pointed
+// at a fixed on-disk dbPath + dbName so data PERSISTS across restarts. This
+// gives `npm run dev` a real, durable database with zero setup.
 async function resolveMongoUri() {
   if (env.mongoUri) return env.mongoUri;
   if (env.nodeEnv === 'production') {
     throw new Error('MONGO_URI is required in production');
   }
   const { MongoMemoryServer } = await import('mongodb-memory-server');
-  const mem = await MongoMemoryServer.create();
+  const dbPath = path.resolve(__dirname, '../../.data/db');
+  fs.mkdirSync(dbPath, { recursive: true });
+  const mem = await MongoMemoryServer.create({
+    // wiredTiger + a stable dbPath/dbName = the data is written to disk and
+    // reloaded on the next start (ephemeral engines would lose it).
+    instance: { dbPath, dbName: 'collabboard', storageEngine: 'wiredTiger' },
+  });
   // eslint-disable-next-line no-console
-  console.log('No MONGO_URI set — using an in-memory MongoDB (data is not persisted)');
+  console.log('No MONGO_URI set — using a local persistent MongoDB at .data/db');
   return mem.getUri();
 }
 
