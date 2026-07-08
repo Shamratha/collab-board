@@ -15,10 +15,13 @@ Built in phases; each phase is independently runnable and demoable.
 
 - [x] **Phase 0** — monorepo scaffold, config, DB connection, `/health`
 - [x] **Phase 1a** — auth: register / login / me (JWT), tests
-- [ ] **Phase 1b** — boards + membership + role-based permissions
-- [ ] **Phase 1c** — lists + cards CRUD, float-position ordering, drag-and-drop
+- [x] **Phase 1b** — boards + membership + role-based permissions
+- [x] **Phase 1c (API)** — lists + cards CRUD, float-position ordering, cascade deletes
+- [ ] **Phase 1c (UI)** — React client + drag-and-drop board
 - [ ] **Phase 2** — Socket.io live sync across clients
 - [ ] **Phase 3 (stretch)** — optimistic UI + version-based conflict resolution
+
+**Backend test coverage:** 42 tests across auth, boards/RBAC, and lists/cards (run `npm test`).
 
 ## Architecture
 
@@ -64,11 +67,28 @@ npm test
 
 ## API (current)
 
-| Method | Path                | Auth | Description                       |
-|--------|---------------------|------|-----------------------------------|
-| POST   | `/api/auth/register`| —    | Create an account, returns a JWT  |
-| POST   | `/api/auth/login`   | —    | Log in, returns a JWT             |
-| GET    | `/api/auth/me`      | JWT  | Current user                      |
-| GET    | `/health`           | —    | Liveness check                    |
+| Method | Path                               | Auth        | Description                              |
+|--------|------------------------------------|-------------|------------------------------------------|
+| POST   | `/api/auth/register`               | —           | Create an account, returns a JWT         |
+| POST   | `/api/auth/login`                  | —           | Log in, returns a JWT                    |
+| GET    | `/api/auth/me`                     | JWT         | Current user                             |
+| GET    | `/api/boards`                      | member      | Boards the caller belongs to             |
+| POST   | `/api/boards`                      | JWT         | Create a board (creator = owner)         |
+| GET    | `/api/boards/:id`                  | member      | Board hydrated with its lists + cards    |
+| PATCH  | `/api/boards/:id`                  | **owner**   | Rename the board                         |
+| DELETE | `/api/boards/:id`                  | **owner**   | Delete board (cascades lists + cards)    |
+| POST   | `/api/boards/:id/members`          | **owner**   | Add a member by email                    |
+| DELETE | `/api/boards/:id/members/:userId`  | **owner**   | Remove a member                          |
+| POST   | `/api/boards/:id/lists`            | member      | Add a list                               |
+| PATCH  | `/api/lists/:id`                   | member      | Rename / reorder a list                  |
+| DELETE | `/api/lists/:id`                   | member      | Delete a list (cascades its cards)       |
+| POST   | `/api/lists/:id/cards`             | member      | Add a card                               |
+| PATCH  | `/api/cards/:id`                   | member      | Edit / move / reorder a card             |
+| DELETE | `/api/cards/:id`                   | member      | Delete a card                            |
+| GET    | `/health`                          | —           | Liveness check                           |
 
-_More routes land as the phases above are completed._
+Reordering: `PATCH` a list/card with either an explicit `position` (float) or
+`before`/`after` neighbor positions — the server places the item at their midpoint.
+Moving a card across lists: include the target `list` id.
+
+_Client UI and real-time sync land in the phases above._

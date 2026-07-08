@@ -1,5 +1,7 @@
 import { Board } from '../models/Board.js';
 import { User } from '../models/User.js';
+import { List } from '../models/List.js';
+import { Card } from '../models/Card.js';
 import { ApiError } from '../utils/ApiError.js';
 
 // GET /api/boards — boards the caller is a member of.
@@ -35,11 +37,16 @@ export async function createBoard(req, res, next) {
   }
 }
 
-// GET /api/boards/:boardId — a single board (loadBoard already authorized it).
+// GET /api/boards/:boardId — a board hydrated with its lists and cards, each
+// ordered by position so the client can render columns directly.
 export async function getBoard(req, res, next) {
   try {
     await req.board.populate('members.user', 'name email');
-    res.json({ board: req.board });
+    const [lists, cards] = await Promise.all([
+      List.find({ board: req.board._id }).sort({ position: 1 }),
+      Card.find({ board: req.board._id }).sort({ position: 1 }),
+    ]);
+    res.json({ board: req.board, lists, cards });
   } catch (err) {
     next(err);
   }
@@ -61,9 +68,13 @@ export async function updateBoard(req, res, next) {
   }
 }
 
-// DELETE /api/boards/:boardId — remove the board (owner only).
+// DELETE /api/boards/:boardId — remove the board and cascade its lists + cards.
 export async function deleteBoard(req, res, next) {
   try {
+    await Promise.all([
+      Card.deleteMany({ board: req.board._id }),
+      List.deleteMany({ board: req.board._id }),
+    ]);
     await req.board.deleteOne();
     res.status(204).end();
   } catch (err) {

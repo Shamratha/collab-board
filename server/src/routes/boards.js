@@ -10,6 +10,7 @@ import {
   addMember,
   removeMember,
 } from '../controllers/boardController.js';
+import { createList } from '../controllers/listController.js';
 
 const router = Router();
 
@@ -24,6 +25,9 @@ router.post('/', createBoard);
 router.get('/:boardId', loadBoard, getBoard);
 router.patch('/:boardId', loadBoard, requireRole('owner'), updateBoard);
 router.delete('/:boardId', loadBoard, requireRole('owner'), deleteBoard);
+
+// Any member may add a list to the board.
+router.post('/:boardId/lists', loadBoard, requireRole('member'), createList);
 
 router.post('/:boardId/members', loadBoard, requireRole('owner'), addMember);
 router.delete(
