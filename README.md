@@ -1,5 +1,7 @@
 # CollabBoard
 
+**[▶ Live demo](https://collab-board-304e.onrender.com)** — sign up and create a board (free-tier host, so the first load may take ~50s to wake).
+
 A collaborative, real-time project board — a mini Linear/Trello. Multiple people
 work on the same board at once: create lists, add cards, drag cards between lists,
 and **every change appears instantly for everyone** viewing the board (no refresh),
@@ -52,12 +54,8 @@ npm run dev:server     # API  → http://localhost:4000
 npm run dev:client     # web  → http://localhost:5173   (separate terminal)
 ```
 
-Open **http://localhost:5173** and sign up, or use the seeded demo account:
-
-```
-email:    demo@collabboard.app
-password: demo1234
-```
+Open **http://localhost:5173** and sign up — your account persists across
+restarts (see [Database](#database) below).
 
 ### Database
 
