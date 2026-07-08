@@ -25,7 +25,12 @@ export const env = {
   mongoUri: process.env.MONGO_URI || '',
   jwtSecret: process.env.JWT_SECRET || 'test-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  // On Render, RENDER_EXTERNAL_URL is injected automatically; since the client
+  // is served from the same origin in production, this keeps CORS/cookies correct.
+  clientOrigin:
+    process.env.CLIENT_ORIGIN ||
+    process.env.RENDER_EXTERNAL_URL ||
+    'http://localhost:5173',
   // Optional: when set, Socket.io uses a Redis pub/sub adapter so rooms work
   // across multiple server instances (horizontal scaling).
   redisUrl: process.env.REDIS_URL || '',

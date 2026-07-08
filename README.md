@@ -242,6 +242,26 @@ manage members; a **member** can edit lists and cards.
 
 ---
 
+## Deploy (Render + MongoDB Atlas)
+
+The repo includes a [`render.yaml`](render.yaml) blueprint. In production the
+server also serves the built React app, so the whole thing runs as **one Render
+web service** on a single origin (which keeps the httpOnly cookie first-party).
+
+1. **Database — MongoDB Atlas (free):** create an M0 cluster, add a database
+   user, allow network access from anywhere (`0.0.0.0/0`), and copy the
+   connection string (append the db name, e.g. `.../collabboard`).
+2. **Render:** New → **Blueprint** → connect this repo. Render reads
+   `render.yaml` and provisions the service (build: install + `vite build`,
+   start: `node src/index.js`).
+3. **Set `MONGO_URI`** in the service's Environment to your Atlas string.
+   `JWT_SECRET` is generated automatically; `NODE_ENV=production` is preset.
+4. Deploy. The app is served at `https://<service>.onrender.com` — API, client,
+   and Socket.io all on that one origin.
+
+No `CLIENT_ORIGIN` needed: Render's `RENDER_EXTERNAL_URL` is picked up
+automatically for CORS.
+
 ## Roadmap
 
 - [x] Auth (JWT) + owner/member RBAC
@@ -250,8 +270,8 @@ manage members; a **member** can edit lists and cards.
 - [x] Optimistic UI + conflict resolution
 - [x] Persistent local database + activity history
 - [x] Hardening — httpOnly-cookie auth, rate limiting, Zod validation, pagination, transactional deletes, Redis scaling
+- [x] Deploy config — single-service Render blueprint + MongoDB Atlas
 - [ ] Member-invite UI (the API exists; front-end pending)
-- [ ] Deploy (Render/Railway + MongoDB Atlas)
 - [ ] Password reset / email verification (out of scope — see above)
 
 ---

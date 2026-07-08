@@ -1,0 +1,20 @@
+# Render Blueprint — deploys CollabBoard as a single web service that serves
+# both the API and the built React client. Bring your own MongoDB (Atlas free
+# tier) and set MONGO_URI in the dashboard.
+services:
+  - type: web
+    name: collab-board
+    runtime: node
+    plan: free
+    # --include=dev so Vite (a devDependency) is available to build the client,
+    # even though the service runs with NODE_ENV=production.
+    buildCommand: npm install --include=dev && npm run build --workspace client
+    startCommand: npm start --workspace server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true # Render generates a strong secret
+      - key: MONGO_URI
+        sync: false # set manually — your MongoDB Atlas connection string
