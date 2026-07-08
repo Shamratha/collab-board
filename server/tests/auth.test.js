@@ -46,6 +46,37 @@ describe('POST /api/auth/register', () => {
   });
 });
 
+describe('validation', () => {
+  it('rejects an invalid email format with 400', async () => {
+    const res = await registerUser({ email: 'not-an-email' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('cookie session', () => {
+  it('sets an httpOnly token cookie on register', async () => {
+    const res = await registerUser();
+    const cookies = res.headers['set-cookie'] || [];
+    expect(cookies.some((c) => c.startsWith('token=') && /HttpOnly/i.test(c))).toBe(true);
+  });
+
+  it('authenticates /me via the cookie alone (no Bearer header)', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/register').send(validUser);
+    const res = await agent.get('/api/auth/me');
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe('ada@example.com');
+  });
+
+  it('logout clears the session', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/register').send(validUser);
+    await agent.post('/api/auth/logout').expect(200);
+    const res = await agent.get('/api/auth/me');
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('POST /api/auth/login', () => {
   it('logs in with correct credentials', async () => {
     await registerUser();

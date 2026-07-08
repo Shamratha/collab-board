@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import authRoutes from './routes/auth.js';
 import boardRoutes from './routes/boards.js';
@@ -12,8 +13,11 @@ import { notFound, errorHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
+  // CORS is locked to the configured client origin, and `credentials: true`
+  // lets the browser send/receive the httpOnly auth cookie cross-origin.
   app.use(cors({ origin: env.clientOrigin, credentials: true }));
-  app.use(express.json());
+  app.use(express.json({ limit: '100kb' }));
+  app.use(cookieParser());
 
   app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

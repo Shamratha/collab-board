@@ -20,7 +20,24 @@ powered by Socket.io rather than polling. Every action is recorded in a live
 - 🤝 **Conflict resolution** — optimistic edits with a version check; concurrent edits surface a merge prompt instead of silently clobbering.
 - 🎨 **Editorial UI** — a warm "paper" theme (Fraunces serif + Inter), colored columns, index-card styling.
 
-**Tests:** 49 passing across auth, boards/RBAC, lists/cards, conflicts, and activity (`npm test`).
+**Tests:** 55 passing across auth, boards/RBAC, lists/cards, conflicts, activity,
+cookie sessions, validation, and pagination (`npm test`).
+
+### Production hardening
+
+| Concern | Approach |
+|---------|----------|
+| **Auth storage** | JWT in an **httpOnly, SameSite=Lax cookie** — not readable by page JS (XSS-safe). Bearer header still accepted for API/test clients. |
+| **Brute force** | `express-rate-limit` on `/auth/login` and `/auth/register` (per-IP window; disabled under test). |
+| **Input validation** | **Zod** schemas validate/normalize every mutating request body before it reaches a controller; failures return `400`. |
+| **Pagination** | Boards use `limit`/`offset`; the activity feed uses **cursor pagination** (`_id`-based) with `nextCursor`. |
+| **Atomic deletes** | Board deletion cascades lists/cards/activity inside a **MongoDB transaction**, with a sequential fallback on single-node deployments. |
+| **Horizontal scaling** | Socket.io uses a **Redis pub/sub adapter** when `REDIS_URL` is set, so `board:<id>` rooms broadcast across instances. |
+| **Reconnect resync** | On socket reconnect, the client re-joins the room **and re-fetches board + history**, so events missed while offline are recovered (not silently dropped). |
+| **CORS** | Locked to `CLIENT_ORIGIN` with `credentials: true` (required for the cookie). |
+
+**Out of scope** (would matter for a real deployment, intentionally omitted here):
+password reset / account recovery, email verification, and refresh-token rotation.
 
 ---
 
@@ -148,12 +165,13 @@ manage members; a **member** can edit lists and cards.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST   | `/api/auth/register`              | —         | Create an account, returns a JWT |
-| POST   | `/api/auth/login`                 | —         | Log in, returns a JWT |
+| POST   | `/api/auth/login`                 | —         | Log in, sets session cookie |
+| POST   | `/api/auth/logout`                | —         | Clear the session cookie |
 | GET    | `/api/auth/me`                    | JWT       | Current user |
-| GET    | `/api/boards`                     | member    | Boards the caller belongs to |
+| GET    | `/api/boards?limit&offset`        | member    | Boards the caller belongs to (paginated) |
 | POST   | `/api/boards`                     | JWT       | Create a board (creator = owner) |
 | GET    | `/api/boards/:id`                 | member    | Board hydrated with its lists + cards |
-| GET    | `/api/boards/:id/activity`        | member    | Recent activity (newest first) |
+| GET    | `/api/boards/:id/activity?cursor&limit` | member | Activity feed (newest first, cursor-paginated) |
 | PATCH  | `/api/boards/:id`                 | **owner** | Rename the board |
 | DELETE | `/api/boards/:id`                 | **owner** | Delete board (cascades lists, cards, activity) |
 | POST   | `/api/boards/:id/members`         | **owner** | Add a member by email |
@@ -180,12 +198,10 @@ manage members; a **member** can edit lists and cards.
 - [x] Real-time sync (Socket.io)
 - [x] Optimistic UI + conflict resolution
 - [x] Persistent local database + activity history
+- [x] Hardening — httpOnly-cookie auth, rate limiting, Zod validation, pagination, transactional deletes, Redis scaling
 - [ ] Member-invite UI (the API exists; front-end pending)
 - [ ] Deploy (Render/Railway + MongoDB Atlas)
-- [ ] `httpOnly`-cookie auth (currently a localStorage token — see below)
-
-> **Security note:** the JWT is stored in `localStorage` for simplicity, which is
-> XSS-exposed. A production upgrade would move it to an `httpOnly` cookie.
+- [ ] Password reset / email verification (out of scope — see above)
 
 ---
 

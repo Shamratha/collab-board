@@ -1,55 +1,67 @@
 import { User } from '../models/User.js';
 import { ApiError } from '../utils/ApiError.js';
-import { signToken } from '../utils/token.js';
+import { signToken, TOKEN_COOKIE } from '../utils/token.js';
+import { env } from '../config/env.js';
 
-// POST /api/auth/register
+// httpOnly cookie so the JWT is never exposed to page JavaScript (mitigates XSS
+// token theft). SameSite=lax blocks cross-site sends → basic CSRF protection.
+function cookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.nodeEnv === 'production',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+  };
+}
+
+// The token is also returned in the body for programmatic/API clients (and the
+// test suite); the web client relies solely on the httpOnly cookie.
+function issueSession(res, user, status = 200) {
+  const token = signToken(user._id);
+  res.cookie(TOKEN_COOKIE, token, cookieOptions());
+  res.status(status).json({ token, user: user.toJSON() });
+}
+
+// POST /api/auth/register  (body validated by Zod middleware)
 export async function register(req, res, next) {
   try {
-    const { name, email, password } = req.body || {};
+    const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      throw new ApiError(400, 'name, email and password are required');
-    }
-    if (String(password).length < 6) {
-      throw new ApiError(400, 'password must be at least 6 characters');
-    }
-
-    const existing = await User.findOne({ email: String(email).toLowerCase() });
+    const existing = await User.findOne({ email });
     if (existing) throw new ApiError(409, 'Email already registered');
 
     const user = new User({ name, email });
     await user.setPassword(password);
     await user.save();
 
-    const token = signToken(user._id);
-    res.status(201).json({ token, user: user.toJSON() });
+    issueSession(res, user, 201);
   } catch (err) {
     next(err);
   }
 }
 
-// POST /api/auth/login
+// POST /api/auth/login  (body validated by Zod middleware)
 export async function login(req, res, next) {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
-      throw new ApiError(400, 'email and password are required');
-    }
+    const { email, password } = req.body;
 
     // passwordHash has select:false, so ask for it explicitly here.
-    const user = await User.findOne({
-      email: String(email).toLowerCase(),
-    }).select('+passwordHash');
-
+    const user = await User.findOne({ email }).select('+passwordHash');
     if (!user || !(await user.comparePassword(password))) {
       throw new ApiError(401, 'Invalid email or password');
     }
 
-    const token = signToken(user._id);
-    res.json({ token, user: user.toJSON() });
+    issueSession(res, user);
   } catch (err) {
     next(err);
   }
+}
+
+// POST /api/auth/logout — clear the session cookie.
+export function logout(_req, res) {
+  res.clearCookie(TOKEN_COOKIE, { ...cookieOptions(), maxAge: undefined });
+  res.json({ ok: true });
 }
 
 // GET /api/auth/me

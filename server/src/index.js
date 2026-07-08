@@ -7,6 +7,7 @@ import { env } from './config/env.js';
 import { connectDB } from './config/db.js';
 import { createApp } from './app.js';
 import { registerSockets } from './sockets/index.js';
+import { attachRedisAdapter } from './sockets/redisAdapter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +46,19 @@ async function start() {
     cors: { origin: env.clientOrigin, credentials: true },
   });
   app.set('io', io);
+
+  // Enable cross-instance broadcasts if a Redis URL is configured.
+  if (env.redisUrl) {
+    try {
+      await attachRedisAdapter(io, env.redisUrl);
+      // eslint-disable-next-line no-console
+      console.log('Socket.io Redis adapter enabled (multi-instance ready)');
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Redis adapter failed, continuing single-node:', err.message);
+    }
+  }
+
   registerSockets(io);
 
   server.listen(env.port, () => {

@@ -18,7 +18,7 @@ function initials(name = '') {
 }
 
 // Slide-in drawer showing the board's history feed.
-export default function ActivityPanel({ open, activities, onClose }) {
+export default function ActivityPanel({ open, activities, hasMore, onLoadMore, onClose }) {
   return (
     <>
       {/* Scrim */}
@@ -73,6 +73,15 @@ export default function ActivityPanel({ open, activities, onClose }) {
                 </li>
               ))}
             </ul>
+          )}
+
+          {hasMore && (
+            <button
+              onClick={onLoadMore}
+              className="mt-3 w-full rounded-lg border border-line bg-surface py-2 text-sm font-medium text-muted transition hover:text-ink"
+            >
+              Load older
+            </button>
           )}
         </div>
       </aside>

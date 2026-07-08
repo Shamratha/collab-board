@@ -1,24 +1,8 @@
 import axios from 'axios';
 
-const TOKEN_KEY = 'collabboard.token';
-
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
-}
-
-export const api = axios.create({ baseURL: '/api' });
-
-// Attach the JWT to every request.
-api.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+// Auth is carried by an httpOnly cookie the browser attaches automatically, so
+// the token is never readable from JS. `withCredentials` sends that cookie.
+export const api = axios.create({ baseURL: '/api', withCredentials: true });
 
 // Normalize server errors: expose `err.message`, plus `err.status` and
 // `err.data` so callers can react to specific cases (e.g. a 409 conflict that

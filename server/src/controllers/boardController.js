@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Board } from '../models/Board.js';
 import { User } from '../models/User.js';
 import { List } from '../models/List.js';
@@ -6,13 +7,24 @@ import { Activity } from '../models/Activity.js';
 import { ApiError } from '../utils/ApiError.js';
 import { logActivity } from '../utils/activity.js';
 
-// GET /api/boards — boards the caller is a member of.
+// GET /api/boards?limit&offset — boards the caller is a member of (paginated).
 export async function listBoards(req, res, next) {
   try {
-    const boards = await Board.find({ 'members.user': req.user._id })
-      .sort({ updatedAt: -1 })
-      .populate('members.user', 'name email');
-    res.json({ boards });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const filter = { 'members.user': req.user._id };
+
+    const [boards, total] = await Promise.all([
+      Board.find(filter)
+        .sort({ updatedAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .populate('members.user', 'name email'),
+      Board.countDocuments(filter),
+    ]);
+
+    const nextOffset = offset + boards.length < total ? offset + boards.length : null;
+    res.json({ boards, total, limit, offset, nextOffset });
   } catch (err) {
     next(err);
   }
@@ -54,13 +66,26 @@ export async function getBoard(req, res, next) {
   }
 }
 
-// GET /api/boards/:boardId/activity — recent activity for the board (newest first).
+// GET /api/boards/:boardId/activity?cursor&limit — activity feed, newest first,
+// cursor-paginated. The cursor is the _id of the last item seen; because
+// ObjectIds are time-ordered, `_id < cursor` cleanly yields the next older page.
 export async function getActivity(req, res, next) {
   try {
-    const activities = await Activity.find({ board: req.board._id })
-      .sort({ createdAt: -1 })
-      .limit(50);
-    res.json({ activities });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
+    const query = { board: req.board._id };
+
+    const { cursor } = req.query;
+    if (cursor && mongoose.isValidObjectId(cursor)) {
+      query._id = { $lt: cursor };
+    }
+
+    // Fetch one extra to know whether another page exists.
+    const rows = await Activity.find(query).sort({ _id: -1 }).limit(limit + 1);
+    const hasMore = rows.length > limit;
+    const activities = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore ? activities[activities.length - 1]._id : null;
+
+    res.json({ activities, nextCursor });
   } catch (err) {
     next(err);
   }
@@ -82,19 +107,47 @@ export async function updateBoard(req, res, next) {
   }
 }
 
-// DELETE /api/boards/:boardId — remove the board and cascade its lists + cards.
+// DELETE /api/boards/:boardId — remove the board and cascade its lists, cards,
+// and activity. Wrapped in a transaction so it's all-or-nothing; falls back to
+// sequential deletes on single-node deployments that don't support transactions.
 export async function deleteBoard(req, res, next) {
-  try {
-    await Promise.all([
-      Card.deleteMany({ board: req.board._id }),
-      List.deleteMany({ board: req.board._id }),
-      Activity.deleteMany({ board: req.board._id }),
+  const boardId = req.board._id;
+  const wipe = (opts = {}) =>
+    Promise.all([
+      Card.deleteMany({ board: boardId }, opts),
+      List.deleteMany({ board: boardId }, opts),
+      Activity.deleteMany({ board: boardId }, opts),
+      Board.deleteOne({ _id: boardId }, opts),
     ]);
-    await req.board.deleteOne();
-    res.status(204).end();
+
+  try {
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(() => wipe({ session }));
+    } finally {
+      await session.endSession();
+    }
+    return res.status(204).end();
   } catch (err) {
+    // Transactions require a replica set (Atlas has one; a single local mongod
+    // does not). Fall back to sequential deletes there.
+    if (isTransactionUnsupported(err)) {
+      await wipe();
+      return res.status(204).end();
+    }
     next(err);
   }
+}
+
+function isTransactionUnsupported(err) {
+  const msg = String(err?.message || '');
+  return (
+    err?.code === 20 || // IllegalOperation
+    err?.codeName === 'IllegalOperation' ||
+    /Transaction numbers are only allowed on a replica set/i.test(msg) ||
+    /Transactions are not supported/i.test(msg) ||
+    /replica set/i.test(msg)
+  );
 }
 
 // POST /api/boards/:boardId/members — add a member by email (owner only).

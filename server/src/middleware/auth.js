@@ -1,15 +1,19 @@
-import { verifyToken } from '../utils/token.js';
+import { verifyToken, TOKEN_COOKIE } from '../utils/token.js';
 import { ApiError } from '../utils/ApiError.js';
 import { User } from '../models/User.js';
 
 // Verifies the Bearer JWT, loads the user, and attaches it to req.user.
 export async function requireAuth(req, _res, next) {
   try {
+    // Prefer the httpOnly cookie (web client); fall back to a Bearer header
+    // (programmatic/API clients and tests).
     const header = req.headers.authorization || '';
-    const [scheme, token] = header.split(' ');
+    const [scheme, headerToken] = header.split(' ');
+    const token =
+      (scheme === 'Bearer' && headerToken) || req.cookies?.[TOKEN_COOKIE];
 
-    if (scheme !== 'Bearer' || !token) {
-      throw new ApiError(401, 'Missing or malformed Authorization header');
+    if (!token) {
+      throw new ApiError(401, 'Authentication required');
     }
 
     let payload;

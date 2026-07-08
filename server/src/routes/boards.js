@@ -12,6 +12,7 @@ import {
   removeMember,
 } from '../controllers/boardController.js';
 import { createList } from '../controllers/listController.js';
+import { validate, schemas } from '../middleware/validate.js';
 
 const router = Router();
 
@@ -19,19 +20,31 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/', listBoards);
-router.post('/', createBoard);
+router.post('/', validate(schemas.createBoard), createBoard);
 
 // Routes scoped to a specific board authorize via loadBoard (membership)
 // and requireRole (owner-only actions).
 router.get('/:boardId', loadBoard, getBoard);
 router.get('/:boardId/activity', loadBoard, getActivity);
-router.patch('/:boardId', loadBoard, requireRole('owner'), updateBoard);
+router.patch('/:boardId', loadBoard, requireRole('owner'), validate(schemas.updateBoard), updateBoard);
 router.delete('/:boardId', loadBoard, requireRole('owner'), deleteBoard);
 
 // Any member may add a list to the board.
-router.post('/:boardId/lists', loadBoard, requireRole('member'), createList);
+router.post(
+  '/:boardId/lists',
+  loadBoard,
+  requireRole('member'),
+  validate(schemas.createList),
+  createList
+);
 
-router.post('/:boardId/members', loadBoard, requireRole('owner'), addMember);
+router.post(
+  '/:boardId/members',
+  loadBoard,
+  requireRole('owner'),
+  validate(schemas.addMember),
+  addMember
+);
 router.delete(
   '/:boardId/members/:userId',
   loadBoard,

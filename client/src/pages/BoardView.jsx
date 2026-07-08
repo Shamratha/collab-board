@@ -49,6 +49,7 @@ export default function BoardView() {
   const [openCard, setOpenCard] = useState(null);
   const [conflict, setConflict] = useState(null);
   const [activities, setActivities] = useState([]);
+  const [activityCursor, setActivityCursor] = useState(null);
   const [showActivity, setShowActivity] = useState(false);
   const [newListTitle, setNewListTitle] = useState('');
   const [error, setError] = useState('');
@@ -71,12 +72,29 @@ export default function BoardView() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
 
-    // Load the board's history alongside it.
-    api
-      .get(`/boards/${id}/activity`)
-      .then(({ data }) => setActivities(data.activities))
-      .catch(() => {});
+    reloadActivities();
   }, [id]);
+
+  // (Re)load the first page of history; also used to resync after a reconnect.
+  async function reloadActivities() {
+    try {
+      const { data } = await api.get(`/boards/${id}/activity`);
+      setActivities(data.activities);
+      setActivityCursor(data.nextCursor);
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  // Load an older page of history (cursor pagination).
+  async function loadMoreActivity() {
+    if (!activityCursor) return;
+    const { data } = await api.get(`/boards/${id}/activity`, {
+      params: { cursor: activityCursor },
+    });
+    setActivities((prev) => [...prev, ...data.activities]);
+    setActivityCursor(data.nextCursor);
+  }
 
   // Real-time sync: join this board's room and apply changes from other users.
   // Handlers are idempotent (keyed by id), so the originator's own echoed
@@ -88,8 +106,24 @@ export default function BoardView() {
       socket.emit('board:join', id, (res) => {
         if (res && !res.ok) setError(res.error || 'Realtime connection failed');
       });
+
+    // If the socket dropped and reconnected, we may have missed events while
+    // offline — re-join the room AND re-fetch the board + history to catch up.
+    // (The first connection is covered by the initial load, so skip resync then.)
+    let firstConnect = true;
+    const onConnect = () => {
+      join();
+      if (firstConnect) {
+        firstConnect = false;
+        return;
+      }
+      refetch();
+      reloadActivities();
+    };
+
+    if (socket.connected) firstConnect = false;
     join();
-    socket.on('connect', join); // re-join after any reconnect
+    socket.on('connect', onConnect);
 
     // Insert/replace a card into its list, kept sorted by position.
     const onCardUpsert = ({ card }) =>
@@ -149,7 +183,7 @@ export default function BoardView() {
 
     return () => {
       socket.emit('board:leave', id);
-      socket.off('connect', join);
+      socket.off('connect', onConnect);
       socket.off('card:created', onCardUpsert);
       socket.off('card:updated', onCardUpsert);
       socket.off('card:deleted', onCardDeleted);
@@ -446,6 +480,8 @@ export default function BoardView() {
       <ActivityPanel
         open={showActivity}
         activities={activities}
+        hasMore={!!activityCursor}
+        onLoadMore={loadMoreActivity}
         onClose={() => setShowActivity(false)}
       />
     </div>

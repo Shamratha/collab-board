@@ -230,6 +230,26 @@ describe('activity history', () => {
     const res = await outsider.auth(request(app).get(`/api/boards/${board._id}/activity`));
     expect(res.status).toBe(403);
   });
+
+  it('paginates with a cursor and returns non-overlapping pages', async () => {
+    const list = await addList('To Do');
+    for (let i = 0; i < 5; i++) await addCard(list._id, `c${i}`);
+
+    const first = await owner.auth(
+      request(app).get(`/api/boards/${board._id}/activity?limit=3`)
+    );
+    expect(first.body.activities).toHaveLength(3);
+    expect(first.body.nextCursor).toBeTruthy();
+
+    const next = await owner.auth(
+      request(app).get(
+        `/api/boards/${board._id}/activity?limit=3&cursor=${first.body.nextCursor}`
+      )
+    );
+    const firstIds = first.body.activities.map((a) => a._id);
+    const nextIds = next.body.activities.map((a) => a._id);
+    expect(nextIds.some((id) => firstIds.includes(id))).toBe(false);
+  });
 });
 
 describe('board hydration', () => {

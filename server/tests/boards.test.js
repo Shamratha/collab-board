@@ -61,6 +61,17 @@ describe('GET /api/boards', () => {
     expect(res.body.boards).toHaveLength(1);
     expect(res.body.boards[0].title).toBe('A');
   });
+
+  it('paginates with limit/offset', async () => {
+    for (let i = 0; i < 3; i++) await createBoard(owner, `B${i}`);
+    const p1 = await owner.auth(request(app).get('/api/boards?limit=2&offset=0'));
+    expect(p1.body.boards).toHaveLength(2);
+    expect(p1.body.total).toBe(3);
+    expect(p1.body.nextOffset).toBe(2);
+    const p2 = await owner.auth(request(app).get('/api/boards?limit=2&offset=2'));
+    expect(p2.body.boards).toHaveLength(1);
+    expect(p2.body.nextOffset).toBeNull();
+  });
 });
 
 describe('GET /api/boards/:id', () => {

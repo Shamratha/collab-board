@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api, getToken, setToken } from '../api/client.js';
+import { api } from '../api/client.js';
 import { disconnectSocket } from '../socket.js';
 
 const AuthContext = createContext(null);
@@ -8,24 +8,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // On first load, if we have a token, hydrate the current user.
+  // On first load, ask the server who we are — the httpOnly cookie (if any) is
+  // sent automatically. A 401 just means "not logged in".
   useEffect(() => {
     let active = true;
-    async function hydrate() {
-      if (!getToken()) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const { data } = await api.get('/auth/me');
-        if (active) setUser(data.user);
-      } catch {
-        setToken(null); // stale/invalid token
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    hydrate();
+    api
+      .get('/auth/me')
+      .then(({ data }) => active && setUser(data.user))
+      .catch(() => {})
+      .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
@@ -33,19 +24,21 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
-    setToken(data.token);
-    setUser(data.user);
+    setUser(data.user); // session cookie set by the server
   }, []);
 
   const register = useCallback(async (name, email, password) => {
     const { data } = await api.post('/auth/register', { name, email, password });
-    setToken(data.token);
     setUser(data.user);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     disconnectSocket();
-    setToken(null);
+    try {
+      await api.post('/auth/logout'); // clears the cookie server-side
+    } catch {
+      /* ignore */
+    }
     setUser(null);
   }, []);
 
