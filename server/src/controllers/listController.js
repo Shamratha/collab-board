@@ -3,6 +3,7 @@ import { Card } from '../models/Card.js';
 import { ApiError } from '../utils/ApiError.js';
 import { appendPosition, between } from '../utils/position.js';
 import { emitToBoard } from '../utils/emit.js';
+import { logActivity } from '../utils/activity.js';
 
 // POST /api/boards/:boardId/lists — create a list, appended to the end.
 export async function createList(req, res, next) {
@@ -18,6 +19,7 @@ export async function createList(req, res, next) {
     });
 
     emitToBoard(req, req.board._id, 'list:created', { list });
+    await logActivity(req, req.board._id, 'list.created', `added list “${list.title}”`);
     res.status(201).json({ list });
   } catch (err) {
     next(err);
@@ -53,9 +55,11 @@ export async function updateList(req, res, next) {
 export async function deleteList(req, res, next) {
   try {
     const listId = String(req.list._id);
+    const listTitle = req.list.title;
     await Card.deleteMany({ list: req.list._id });
     await req.list.deleteOne();
     emitToBoard(req, req.board._id, 'list:deleted', { listId });
+    await logActivity(req, req.board._id, 'list.deleted', `deleted list “${listTitle}”`);
     res.status(204).end();
   } catch (err) {
     next(err);

@@ -3,7 +3,7 @@
 /* Design tokens — a warm "paper workshop" palette, ink + coral, not the
    default indigo-on-slate. Exposed as Tailwind utilities via @theme. */
 @theme {
-  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   --color-paper: #f4efe4;
@@ -37,10 +37,11 @@ body {
   background-size: 22px 22px;
 }
 
-/* Slightly tighter, more editorial display headings. */
+/* Editorial serif headings with a touch of optical weight. */
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+  letter-spacing: -0.005em;
 }
 
 /* A hand-drawn-ish underline accent used behind key words. */

@@ -2,7 +2,9 @@ import { Board } from '../models/Board.js';
 import { User } from '../models/User.js';
 import { List } from '../models/List.js';
 import { Card } from '../models/Card.js';
+import { Activity } from '../models/Activity.js';
 import { ApiError } from '../utils/ApiError.js';
+import { logActivity } from '../utils/activity.js';
 
 // GET /api/boards — boards the caller is a member of.
 export async function listBoards(req, res, next) {
@@ -52,6 +54,18 @@ export async function getBoard(req, res, next) {
   }
 }
 
+// GET /api/boards/:boardId/activity — recent activity for the board (newest first).
+export async function getActivity(req, res, next) {
+  try {
+    const activities = await Activity.find({ board: req.board._id })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json({ activities });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // PATCH /api/boards/:boardId — rename (owner only).
 export async function updateBoard(req, res, next) {
   try {
@@ -74,6 +88,7 @@ export async function deleteBoard(req, res, next) {
     await Promise.all([
       Card.deleteMany({ board: req.board._id }),
       List.deleteMany({ board: req.board._id }),
+      Activity.deleteMany({ board: req.board._id }),
     ]);
     await req.board.deleteOne();
     res.status(204).end();
@@ -101,6 +116,7 @@ export async function addMember(req, res, next) {
     req.board.members.push({ user: user._id, role });
     await req.board.save();
     await req.board.populate('members.user', 'name email');
+    await logActivity(req, req.board._id, 'member.added', `added ${user.name} to the board`);
     res.status(201).json({ board: req.board });
   } catch (err) {
     next(err);

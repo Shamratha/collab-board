@@ -6,7 +6,7 @@ function MiniBoard() {
   const cols = [
     { c: '#e4572e', items: ['Draft the brief', 'Sync with design'] },
     { c: '#2a9d8f', items: ['Ship auth', 'Wire sockets'] },
-    { c: '#e0a100', items: ['Launch 🎉'] },
+    { c: '#e0a100', items: ['Launch day'] },
   ];
   return (
     <div className="flex gap-3">

@@ -5,7 +5,9 @@ export default function ConflictDialog({ attempted, server, onOverwrite, onDisca
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-ink/50 px-4 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-2xl">
         <div className="mb-1 flex items-center gap-2">
-          <span className="text-lg">⚠️</span>
+          <span className="grid h-5 w-5 place-items-center rounded-full bg-accent text-xs font-bold text-white">
+            !
+          </span>
           <h2 className="font-display text-lg font-bold text-ink">
             This card changed while you were editing
           </h2>

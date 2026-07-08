@@ -3,6 +3,7 @@ import { List } from '../models/List.js';
 import { ApiError } from '../utils/ApiError.js';
 import { appendPosition, between } from '../utils/position.js';
 import { emitToBoard } from '../utils/emit.js';
+import { logActivity } from '../utils/activity.js';
 
 // POST /api/lists/:listId/cards — create a card at the end of the list.
 export async function createCard(req, res, next) {
@@ -21,6 +22,12 @@ export async function createCard(req, res, next) {
     });
 
     emitToBoard(req, req.board._id, 'card:created', { card });
+    await logActivity(
+      req,
+      req.board._id,
+      'card.created',
+      `added “${card.title}” to ${req.list.title}`
+    );
     res.status(201).json({ card });
   } catch (err) {
     next(err);
@@ -45,6 +52,10 @@ export async function updateCard(req, res, next) {
       });
     }
 
+    const contentEdited =
+      (title !== undefined && String(title).trim() !== req.card.title) ||
+      (description !== undefined && String(description) !== req.card.description);
+
     if (title !== undefined) {
       if (!String(title).trim()) throw new ApiError(400, 'title cannot be empty');
       req.card.title = String(title).trim();
@@ -53,10 +64,12 @@ export async function updateCard(req, res, next) {
       req.card.description = String(description);
     }
 
+    let movedToTitle = null;
     if (list !== undefined && String(list) !== String(req.card.list)) {
       const target = await List.findOne({ _id: list, board: req.board._id });
       if (!target) throw new ApiError(400, 'Target list is not on this board');
       req.card.list = target._id;
+      movedToTitle = target.title;
     }
 
     if (position !== undefined) {
@@ -68,6 +81,14 @@ export async function updateCard(req, res, next) {
     req.card.version += 1;
     await req.card.save();
     emitToBoard(req, req.board._id, 'card:updated', { card: req.card });
+
+    // Log the meaningful change (a move reads better than "edited").
+    if (movedToTitle) {
+      await logActivity(req, req.board._id, 'card.moved', `moved “${req.card.title}” to ${movedToTitle}`);
+    } else if (contentEdited) {
+      await logActivity(req, req.board._id, 'card.edited', `edited “${req.card.title}”`);
+    }
+
     res.json({ card: req.card });
   } catch (err) {
     next(err);
@@ -79,8 +100,10 @@ export async function deleteCard(req, res, next) {
   try {
     const cardId = String(req.card._id);
     const listId = String(req.card.list);
+    const cardTitle = req.card.title;
     await req.card.deleteOne();
     emitToBoard(req, req.board._id, 'card:deleted', { cardId, listId });
+    await logActivity(req, req.board._id, 'card.deleted', `deleted “${cardTitle}”`);
     res.status(204).end();
   } catch (err) {
     next(err);

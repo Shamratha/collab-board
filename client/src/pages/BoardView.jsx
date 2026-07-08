@@ -15,6 +15,7 @@ import { positionBetween } from '../utils/position.js';
 import ListColumn from '../components/ListColumn.jsx';
 import CardModal from '../components/CardModal.jsx';
 import ConflictDialog from '../components/ConflictDialog.jsx';
+import ActivityPanel from '../components/ActivityPanel.jsx';
 import { listColor } from '../theme.js';
 
 // Group a flat, position-sorted card array into { listId: [cards] }, ensuring
@@ -47,6 +48,8 @@ export default function BoardView() {
   const [activeCard, setActiveCard] = useState(null);
   const [openCard, setOpenCard] = useState(null);
   const [conflict, setConflict] = useState(null);
+  const [activities, setActivities] = useState([]);
+  const [showActivity, setShowActivity] = useState(false);
   const [newListTitle, setNewListTitle] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,12 @@ export default function BoardView() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+
+    // Load the board's history alongside it.
+    api
+      .get(`/boards/${id}/activity`)
+      .then(({ data }) => setActivities(data.activities))
+      .catch(() => {});
   }, [id]);
 
   // Real-time sync: join this board's room and apply changes from other users.
@@ -128,11 +137,15 @@ export default function BoardView() {
     };
 
     socket.on('card:created', onCardUpsert);
+    const onActivity = ({ activity }) =>
+      setActivities((prev) => [activity, ...prev].slice(0, 50));
+
     socket.on('card:updated', onCardUpsert);
     socket.on('card:deleted', onCardDeleted);
     socket.on('list:created', onListCreated);
     socket.on('list:updated', onListUpdated);
     socket.on('list:deleted', onListDeleted);
+    socket.on('activity:created', onActivity);
 
     return () => {
       socket.emit('board:leave', id);
@@ -143,6 +156,7 @@ export default function BoardView() {
       socket.off('list:created', onListCreated);
       socket.off('list:updated', onListUpdated);
       socket.off('list:deleted', onListDeleted);
+      socket.off('activity:created', onActivity);
     };
   }, [id]);
 
@@ -351,6 +365,21 @@ export default function BoardView() {
         <span className="ml-1 rounded-full bg-teal/15 px-2 py-0.5 text-xs font-medium text-teal">
           live
         </span>
+        <button
+          onClick={() => setShowActivity(true)}
+          className="ml-auto flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink transition hover:border-ink/30 hover:shadow-sm"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="text-muted">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+            <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          History
+          {activities.length > 0 && (
+            <span className="rounded-full bg-ink/5 px-1.5 text-xs text-muted">
+              {activities.length}
+            </span>
+          )}
+        </button>
       </div>
       {error && <p className="mb-3 text-sm text-accent-ink">{error}</p>}
 
@@ -413,6 +442,12 @@ export default function BoardView() {
           onDiscard={resolveDiscard}
         />
       )}
+
+      <ActivityPanel
+        open={showActivity}
+        activities={activities}
+        onClose={() => setShowActivity(false)}
+      />
     </div>
   );
 }

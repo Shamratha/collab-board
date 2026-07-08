@@ -56,10 +56,21 @@ export default function BoardsList() {
         <p className="text-muted">Loading…</p>
       ) : boards.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-surface/60 px-8 py-14 text-center">
-          <div className="mb-2 text-3xl">🗂️</div>
-          <p className="font-display text-lg font-semibold text-ink">No boards yet</p>
+          <svg
+            width="52"
+            height="40"
+            viewBox="0 0 52 40"
+            className="mx-auto mb-3 text-muted/50"
+            fill="none"
+          >
+            <rect x="1" y="6" width="14" height="33" rx="2" stroke="currentColor" strokeWidth="2" />
+            <rect x="19" y="6" width="14" height="24" rx="2" stroke="currentColor" strokeWidth="2" />
+            <rect x="37" y="6" width="14" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+            <path d="M4 2h46" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 5" />
+          </svg>
+          <p className="font-display text-xl font-semibold text-ink">No boards yet</p>
           <p className="mt-1 text-muted">
-            Every big thing starts as an empty first column. Create one above.
+            Every big thing starts as an empty first column. Name one above.
           </p>
         </div>
       ) : (
@@ -93,6 +104,10 @@ export default function BoardsList() {
           })}
         </ul>
       )}
+
+      <footer className="mt-16 border-t border-line pt-6 text-sm text-muted">
+        CollabBoard — a small real-time board, built by Shamratha.
+      </footer>
     </div>
   );
 }

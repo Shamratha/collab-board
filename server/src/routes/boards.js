@@ -5,6 +5,7 @@ import {
   listBoards,
   createBoard,
   getBoard,
+  getActivity,
   updateBoard,
   deleteBoard,
   addMember,
@@ -23,6 +24,7 @@ router.post('/', createBoard);
 // Routes scoped to a specific board authorize via loadBoard (membership)
 // and requireRole (owner-only actions).
 router.get('/:boardId', loadBoard, getBoard);
+router.get('/:boardId/activity', loadBoard, getActivity);
 router.patch('/:boardId', loadBoard, requireRole('owner'), updateBoard);
 router.delete('/:boardId', loadBoard, requireRole('owner'), deleteBoard);
 

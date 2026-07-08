@@ -193,6 +193,45 @@ describe('cards', () => {
   });
 });
 
+describe('activity history', () => {
+  it('records a human-readable entry when a card is created', async () => {
+    const list = await addList('To Do');
+    await addCard(list._id, 'Wire up auth');
+    const res = await owner.auth(request(app).get(`/api/boards/${board._id}/activity`));
+    expect(res.status).toBe(200);
+    const created = res.body.activities.find((a) => a.type === 'card.created');
+    expect(created).toBeTruthy();
+    expect(created.actorName).toBe('Owner');
+    expect(created.text).toContain('Wire up auth');
+  });
+
+  it('records a move with the destination list', async () => {
+    const todo = await addList('To Do');
+    const done = await addList('Done');
+    const card = await addCard(todo._id, 'Ship it');
+    await owner
+      .auth(request(app).patch(`/api/cards/${card._id}`))
+      .send({ list: done._id });
+    const res = await owner.auth(request(app).get(`/api/boards/${board._id}/activity`));
+    const moved = res.body.activities.find((a) => a.type === 'card.moved');
+    expect(moved.text).toContain('Done');
+  });
+
+  it('is newest-first and scoped to the board', async () => {
+    const list = await addList('To Do');
+    await addCard(list._id, 'first');
+    await addCard(list._id, 'second');
+    const res = await owner.auth(request(app).get(`/api/boards/${board._id}/activity`));
+    // Most recent entry is at the front.
+    expect(res.body.activities[0].text).toContain('second');
+  });
+
+  it('denies activity access to non-members (403)', async () => {
+    const res = await outsider.auth(request(app).get(`/api/boards/${board._id}/activity`));
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('board hydration', () => {
   it('returns lists and cards ordered by position', async () => {
     const todo = await addList('To Do');
