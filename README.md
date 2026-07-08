@@ -13,12 +13,12 @@ powered by Socket.io rather than polling. Every action is recorded in a live
 
 ## Highlights
 
-- 🔐 **Auth & permissions** — JWT (bcrypt-hashed passwords); board **owner** vs **member** roles.
-- 🗂️ **Boards / lists / cards** — full CRUD with drag-and-drop, backed by fractional-position ordering (O(1) reorders).
-- ⚡ **Real-time sync** — one person moves a card, everyone sees it instantly. "Commit then broadcast": the DB stays the single source of truth.
-- 🕘 **Activity history** — a durable, live feed of who did what and when, per board.
-- 🤝 **Conflict resolution** — optimistic edits with a version check; concurrent edits surface a merge prompt instead of silently clobbering.
-- 🎨 **Editorial UI** — a warm "paper" theme (Fraunces serif + Inter), colored columns, index-card styling.
+- **Auth & permissions** — JWT (bcrypt-hashed passwords); board **owner** vs **member** roles.
+- **Boards / lists / cards** — full CRUD with drag-and-drop, backed by fractional-position ordering (O(1) reorders).
+- **Real-time sync** — one person moves a card, everyone sees it instantly. "Commit then broadcast": the DB stays the single source of truth.
+- **Activity history** — a durable, live feed of who did what and when, per board.
+- **Conflict resolution** — optimistic edits with a version check; concurrent edits surface a merge prompt instead of silently clobbering.
+- **Editorial UI** — a warm "paper" theme (Fraunces serif + Inter), colored columns, index-card styling.
 
 **Tests:** 55 passing across auth, boards/RBAC, lists/cards, conflicts, activity,
 cookie sessions, validation, and pagination (`npm test`).
@@ -93,6 +93,24 @@ The REST layer stays the single source of truth:
 4. Clients apply events **idempotently by id**, so every viewer — including the
    originator — converges on server state with no double-applies.
 
+```mermaid
+sequenceDiagram
+    actor A as User A
+    actor B as User B
+    participant API as Express API
+    participant DB as MongoDB
+    participant Room as Socket.io room
+
+    A->>API: PATCH /cards/:id (move)
+    API->>DB: write (commit)
+    DB-->>API: ok
+    API-->>A: 200 + updated card
+    API->>Room: emit card:updated
+    Room-->>A: card:updated
+    Room-->>B: card:updated
+    Note over A,B: both converge on server state — no refresh
+```
+
 ### Optimistic UI + conflict resolution
 
 Card edits apply **optimistically** (instant, then reconciled with the server;
@@ -122,6 +140,39 @@ client shows it in a slide-in **History** panel that updates in real time.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    subgraph Browser["Browser — React SPA (Vite)"]
+        UI["Pages &amp; components<br/>drag-and-drop · History panel"]
+        Axios["axios — REST<br/>httpOnly cookie"]
+        WS["socket.io-client"]
+        UI --> Axios
+        UI --> WS
+    end
+
+    subgraph Server["Node.js server (Express)"]
+        REST["REST API<br/>rateLimit · Zod · requireAuth · RBAC"]
+        Ctrl["Controllers"]
+        IO["Socket.io<br/>JWT handshake · board rooms"]
+        REST --> Ctrl
+        Ctrl -->|emit change| IO
+    end
+
+    DB[("MongoDB<br/>User · Board · List · Card · Activity")]
+    Redis[("Redis — optional<br/>pub/sub adapter")]
+
+    Axios -->|JSON over HTTP| REST
+    WS <-->|WebSocket| IO
+    Ctrl -->|"read / write — source of truth"| DB
+    IO -.->|multi-instance fan-out| Redis
+    IO -->|broadcast to room| WS
+```
+
+The write path is the single source of truth: a REST mutation commits to MongoDB,
+**then** the controller emits a change event to the board's Socket.io room, and
+every connected client reconciles. Redis is only needed to fan those broadcasts
+out across multiple server instances.
+
 ```
 collab-board/                 npm workspaces monorepo (ESM)
 ├─ server/                    Express + Mongoose + Socket.io + JWT
@@ -136,7 +187,7 @@ collab-board/                 npm workspaces monorepo (ESM)
       ├─ pages/               Login, Register, BoardsList, BoardView
       ├─ components/          board, list, card, modals, ActivityPanel
       ├─ context/             AuthContext
-      └─ api/ · socket.js     axios (token interceptor) + shared socket
+      └─ api/ · socket.js     axios (withCredentials) + shared socket
 ```
 
 ### Data model
