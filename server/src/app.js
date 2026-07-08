@@ -19,6 +19,10 @@ const clientDist = path.resolve(__dirname, '../../client/dist');
 export function createApp() {
   const app = express();
 
+  // Behind Render's (or any) reverse proxy: trust the first hop so req.ip is the
+  // real client IP (X-Forwarded-For) and secure cookies / rate-limiting work.
+  if (env.nodeEnv === 'production') app.set('trust proxy', 1);
+
   // CORS is locked to the configured client origin, and `credentials: true`
   // lets the browser send/receive the httpOnly auth cookie cross-origin.
   app.use(cors({ origin: env.clientOrigin, credentials: true }));
