@@ -18,10 +18,23 @@ Built in phases; each phase is independently runnable and demoable.
 - [x] **Phase 1b** — boards + membership + role-based permissions
 - [x] **Phase 1c (API)** — lists + cards CRUD, float-position ordering, cascade deletes
 - [x] **Phase 1c (UI)** — React client: auth pages, boards list, drag-and-drop board
-- [ ] **Phase 2** — Socket.io live sync across clients
+- [x] **Phase 2** — Socket.io live sync across clients
 - [ ] **Phase 3 (stretch)** — optimistic UI + version-based conflict resolution
 
 **Backend test coverage:** 42 tests across auth, boards/RBAC, and lists/cards (run `npm test`).
+
+### Real-time sync (Phase 2)
+
+Sockets carry *notifications of committed changes*, never the writes themselves —
+the REST layer stays the single source of truth ("commit then broadcast"):
+
+1. A socket authenticates on the handshake with the **same JWT** as the REST API.
+2. Opening a board joins the room `board:<id>` — but only after the server
+   re-checks membership.
+3. After any successful list/card mutation, the controller emits to that room
+   (`card:created`, `card:updated`, `card:deleted`, `list:*`).
+4. Clients apply events **idempotently by id**, so every viewer — including the
+   originator — converges on server state with no double-applies.
 
 ## Architecture
 

@@ -2,6 +2,7 @@ import { Card } from '../models/Card.js';
 import { List } from '../models/List.js';
 import { ApiError } from '../utils/ApiError.js';
 import { appendPosition, between } from '../utils/position.js';
+import { emitToBoard } from '../utils/emit.js';
 
 // POST /api/lists/:listId/cards — create a card at the end of the list.
 export async function createCard(req, res, next) {
@@ -19,6 +20,7 @@ export async function createCard(req, res, next) {
       createdBy: req.user._id,
     });
 
+    emitToBoard(req, req.board._id, 'card:created', { card });
     res.status(201).json({ card });
   } catch (err) {
     next(err);
@@ -54,6 +56,7 @@ export async function updateCard(req, res, next) {
 
     req.card.version += 1;
     await req.card.save();
+    emitToBoard(req, req.board._id, 'card:updated', { card: req.card });
     res.json({ card: req.card });
   } catch (err) {
     next(err);
@@ -63,7 +66,10 @@ export async function updateCard(req, res, next) {
 // DELETE /api/cards/:cardId — remove a card.
 export async function deleteCard(req, res, next) {
   try {
+    const cardId = String(req.card._id);
+    const listId = String(req.card.list);
     await req.card.deleteOne();
+    emitToBoard(req, req.board._id, 'card:deleted', { cardId, listId });
     res.status(204).end();
   } catch (err) {
     next(err);

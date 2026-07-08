@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { api } from '../api/client.js';
+import { getSocket } from '../socket.js';
 import { positionBetween } from '../utils/position.js';
 import ListColumn from '../components/ListColumn.jsx';
 import CardModal from '../components/CardModal.jsx';
@@ -54,6 +55,83 @@ export default function BoardView() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  // Real-time sync: join this board's room and apply changes from other users.
+  // Handlers are idempotent (keyed by id), so the originator's own echoed
+  // events simply converge local state onto server truth.
+  useEffect(() => {
+    const socket = getSocket();
+
+    const join = () =>
+      socket.emit('board:join', id, (res) => {
+        if (res && !res.ok) setError(res.error || 'Realtime connection failed');
+      });
+    join();
+    socket.on('connect', join); // re-join after any reconnect
+
+    // Insert/replace a card into its list, kept sorted by position.
+    const onCardUpsert = ({ card }) =>
+      setCardsByList((prev) => {
+        const next = {};
+        for (const [listId, cards] of Object.entries(prev)) {
+          next[listId] = cards.filter((c) => c._id !== card._id);
+        }
+        next[card.list] = [...(next[card.list] || []), card].sort(
+          (a, b) => a.position - b.position
+        );
+        return next;
+      });
+
+    const onCardDeleted = ({ cardId }) =>
+      setCardsByList((prev) => {
+        const next = {};
+        for (const [listId, cards] of Object.entries(prev)) {
+          next[listId] = cards.filter((c) => c._id !== cardId);
+        }
+        return next;
+      });
+
+    const onListCreated = ({ list }) => {
+      setLists((prev) =>
+        prev.some((l) => l._id === list._id)
+          ? prev
+          : [...prev, list].sort((a, b) => a.position - b.position)
+      );
+      setCardsByList((prev) => (prev[list._id] ? prev : { ...prev, [list._id]: [] }));
+    };
+
+    const onListUpdated = ({ list }) =>
+      setLists((prev) =>
+        prev.map((l) => (l._id === list._id ? list : l)).sort((a, b) => a.position - b.position)
+      );
+
+    const onListDeleted = ({ listId }) => {
+      setLists((prev) => prev.filter((l) => l._id !== listId));
+      setCardsByList((prev) => {
+        const next = { ...prev };
+        delete next[listId];
+        return next;
+      });
+    };
+
+    socket.on('card:created', onCardUpsert);
+    socket.on('card:updated', onCardUpsert);
+    socket.on('card:deleted', onCardDeleted);
+    socket.on('list:created', onListCreated);
+    socket.on('list:updated', onListUpdated);
+    socket.on('list:deleted', onListDeleted);
+
+    return () => {
+      socket.emit('board:leave', id);
+      socket.off('connect', join);
+      socket.off('card:created', onCardUpsert);
+      socket.off('card:updated', onCardUpsert);
+      socket.off('card:deleted', onCardDeleted);
+      socket.off('list:created', onListCreated);
+      socket.off('list:updated', onListUpdated);
+      socket.off('list:deleted', onListDeleted);
+    };
   }, [id]);
 
   const containerIds = useMemo(() => new Set(lists.map((l) => l._id)), [lists]);

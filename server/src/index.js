@@ -3,6 +3,7 @@ import { Server as SocketServer } from 'socket.io';
 import { env } from './config/env.js';
 import { connectDB } from './config/db.js';
 import { createApp } from './app.js';
+import { registerSockets } from './sockets/index.js';
 
 // Dev convenience: if no MONGO_URI is configured (and we're not in production),
 // spin up an in-memory MongoDB so `npm run dev` just works with zero setup.
@@ -31,6 +32,7 @@ async function start() {
     cors: { origin: env.clientOrigin, credentials: true },
   });
   app.set('io', io);
+  registerSockets(io);
 
   server.listen(env.port, () => {
     // eslint-disable-next-line no-console

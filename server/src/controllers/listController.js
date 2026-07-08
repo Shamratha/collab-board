@@ -2,6 +2,7 @@ import { List } from '../models/List.js';
 import { Card } from '../models/Card.js';
 import { ApiError } from '../utils/ApiError.js';
 import { appendPosition, between } from '../utils/position.js';
+import { emitToBoard } from '../utils/emit.js';
 
 // POST /api/boards/:boardId/lists — create a list, appended to the end.
 export async function createList(req, res, next) {
@@ -16,6 +17,7 @@ export async function createList(req, res, next) {
       position: appendPosition(last?.position),
     });
 
+    emitToBoard(req, req.board._id, 'list:created', { list });
     res.status(201).json({ list });
   } catch (err) {
     next(err);
@@ -40,6 +42,7 @@ export async function updateList(req, res, next) {
     }
 
     await req.list.save();
+    emitToBoard(req, req.board._id, 'list:updated', { list: req.list });
     res.json({ list: req.list });
   } catch (err) {
     next(err);
@@ -49,8 +52,10 @@ export async function updateList(req, res, next) {
 // DELETE /api/lists/:listId — remove the list and cascade its cards.
 export async function deleteList(req, res, next) {
   try {
+    const listId = String(req.list._id);
     await Card.deleteMany({ list: req.list._id });
     await req.list.deleteOne();
+    emitToBoard(req, req.board._id, 'list:deleted', { listId });
     res.status(204).end();
   } catch (err) {
     next(err);
